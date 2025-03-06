@@ -1,3 +1,7 @@
+pub mod udp_server;
+pub mod tcp_server;
+pub mod server_logic;
+
 use std::collections::HashMap;
 use rapier2d::prelude::*;
 
@@ -177,16 +181,17 @@ impl GameState {
         (pos.x, pos.y, size.x, size. y)
     }
 
-    pub fn step(&mut self, frame_time: f32) {
+    pub fn step(&mut self, frame_time: f32) -> bool{
         self.time += frame_time;
         self.game_time += frame_time;
         // let mut c = 0;
+        let mut update_done = false;
         while self.time - TIME_STEP > 0.0 {
             // c += 1;
             self.time -= TIME_STEP;
 
-            self.control_player(self.player1_handle, self.player1_collider_handle, self.middle_wall_handle, self.right_wall_handle);
-            self.control_player(self.player2_handle, self.player2_collider_handle, self.left_wall_handle, self.middle_wall_handle);
+            self.control_player(self.player1_handle);
+            self.control_player(self.player2_handle);
 
             self.physics_pipeline.step(
                 &self.gravity,
@@ -203,6 +208,7 @@ impl GameState {
                 &self.physics_hooks,
                 &self.event_handler,
             );
+            update_done = true;
         }
         // println!("counter {}", c);
 
@@ -211,9 +217,11 @@ impl GameState {
         // println!("line vel: {}", player1_body.linvel());
         // println!("forces {}", player1_body.user_force());
         // println!("time {}", self.game_time);
+
+        update_done
     }
 
-    fn control_player(&mut self, handle: RigidBodyHandle, collider: ColliderHandle, left: ColliderHandle, right: ColliderHandle) {
+    fn control_player(&mut self, handle: RigidBodyHandle) {
         let player_body = &mut self.rigid_body_set[handle];
         let pressing_left = self.player_input[&handle][0];
         let pressing_right = self.player_input[&handle][1];
@@ -238,10 +246,6 @@ impl GameState {
 
         if v.x.abs() < ALMOST_ZERO {
             player_body.set_linvel(vector![0.0, v.y], true);
-        }
-
-        if contact(&self.narrow_phase, collider, right) && pressing_right || contact(&self.narrow_phase, collider, left) && pressing_left {
-            player_body.reset_forces(true);
         }
     }
 
