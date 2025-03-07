@@ -1,4 +1,5 @@
 use std::net::{SocketAddr, UdpSocket};
+use std::time::Instant;
 use macroquad::prelude::*;
 
 const WIDTH: f32 = 800.0;
@@ -30,11 +31,19 @@ async fn main() {
     let player_id: [u8; 8] = buff[4..12].try_into().unwrap();
     let board_id: [u8; 8] = buff[12..20].try_into().unwrap();
 
+    let mut ping_time = Instant::now();
+
     let mut packet = [0; 32];
     packet[..6].copy_from_slice(&[58, 41, 58, 80, 58, 68]);
     packet[8..16].copy_from_slice(&player_id);
     packet[16..24].copy_from_slice(&board_id);
     loop {
+        if ping_time.elapsed().as_secs() >= 1 {
+            packet[6..8].copy_from_slice(&[96, 22]);
+            socket.send_to(&packet, ("127.0.0.1", 12542)).unwrap();
+            ping_time = Instant::now();
+            println!("ping!");
+        }
         // PLAYER INPUT
         if is_key_pressed(KeyCode::Escape) {
             break;

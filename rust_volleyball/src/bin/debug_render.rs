@@ -80,6 +80,14 @@ async fn main() {
         let (xn, yn, wn, hn) = resize_box_shape(game_state.net());
         draw_rectangle(xn, yn, wn, hn, BROWN);
 
+        let (p1, p2, game_over) = game_state.points();
+        draw_text(&p1.to_string(), WIDTH / 2.0 + 120.0, 60.0, 100.0, BLACK);
+        draw_text(&p2.to_string(), WIDTH / 2.0 - 170.0, 60.0, 100.0, BLACK);
+        if game_over {
+            let winner = if p1 > p2 { "Player 1" } else { "Player 2" };
+            draw_text(&format!("{winner} won!"), 120.0, 150.0, 100.0, BLACK);
+        }
+
         // if loop_counter % 5 == 0 {
         //     println!("player1 x: {} y: {} r: {}", xp1, yp1, rp1);
         //     println!("player2 x: {} y: {} r: {}", xp2, yp2, rp2);

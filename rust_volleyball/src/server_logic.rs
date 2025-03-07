@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
 use std::sync::mpsc::{Receiver, Sender};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use log::error;
 use rand::Rng;
 use crate::GameState;
@@ -26,6 +26,7 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
     let mut player_in_lobby: Option<(u64, u64)> = None;
     let mut boards: HashMap<u64, (u64, u64, GameState)> = HashMap::new();
     let mut update_queue: VecDeque<(Instant, u64)> = VecDeque::new();
+    let mut ping_time : HashMap<u64, Instant> = HashMap::new();
     let mut rng = rand::rng();
 
     loop {
@@ -51,14 +52,8 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                                         player1_pos: (p1x, p1y),
                                         player2_pos: (p2x, p2y),
                                     };
-                                    match udp_sender.send(SenderMsg::GameLogicState(*player1, serialized)) {
-                                        Ok(_) => {}
-                                        Err(e) => log::error!("Cannot send UPD game state, {e}")
-                                    }
-                                    match udp_sender.send(SenderMsg::GameLogicState(*player2, serialized)) {
-                                        Ok(_) => {}
-                                        Err(e) => log::error!("Cannot send UPD game state, {e}")
-                                    }
+                                    notify(&ping_time, player1, &udp_sender, serialized);
+                                    notify(&ping_time, player2, &udp_sender, serialized);
                                 }
 
                                 // todo clean after game finishes
@@ -84,6 +79,9 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                                 let game = GameState::new();
                                 boards.insert(board_id, (waiting_player_id, player_id, game));
                                 update_queue.push_back((Instant::now(), board_id));
+                                ping_time.insert(waiting_player_id, Instant::now());
+                                ping_time.insert(player_id, Instant::now());
+                                player_in_lobby = None;
                                 match logic_sender.send(LogicMessage::CalculateBoard) {
                                     Ok(()) => {}
                                     Err(e) => log::error!("Cannot send CalculateBoard, {e}")
@@ -112,10 +110,28 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                                 }
                             }
                         }
+                    },
+                    MsgIn::Ping(player_id, board_id) => {
+                        match boards.get(&board_id) {
+                            None => log::warn!("Wrong ping board id"),
+                            Some((p1, p2, _board)) => match player_id == *p1 || player_id == *p2 {
+                                true => { ping_time.insert(player_id, Instant::now()); },
+                                false => log::warn!("Wrong ping player id")
+                            }
+                        }
                     }
                 }
             }
             Err(e) => error!("Game logic receive error, {e}")
+        }
+    }
+}
+
+fn notify(pings: &HashMap<u64, Instant>, player: &u64, sender: &Sender<SenderMsg>, state: GameStateSerialized) {
+    if pings.get(player).is_some_and(|t| t.elapsed() < Duration::from_secs(5)) {
+        match sender.send(SenderMsg::GameLogicState(*player, state)) {
+            Ok(_) => {}
+            Err(e) => log::error!("Cannot send UPD game state, {e}")
         }
     }
 }

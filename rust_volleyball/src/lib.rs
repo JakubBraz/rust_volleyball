@@ -3,6 +3,7 @@ pub mod tcp_server;
 pub mod server_logic;
 
 use std::collections::HashMap;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use rapier2d::prelude::*;
 
 const TIME_STEP: f32 = 1.0 / 60.0;
@@ -10,6 +11,17 @@ const TIME_STEP: f32 = 1.0 / 60.0;
 const MAX_SPEED: f32 = 3.0;
 const ALMOST_ZERO: f32 = 0.001;
 const MOVE_FORCE: f32 = 10.0;
+const START_BALL_1: f32 = 5.5;
+const START_BALL_2: f32 = 2.5;
+const START_BALL_HEIGHT: f32 = 2.0;
+const START_PLAYER_1: f32 = 6.0;
+const START_PLAYER_2: f32 = 2.0;
+const START_PLAYER_HEIGHT: f32 = 0.6;
+const POINT_LIMIT: u32 = 10;
+
+// scoring, reset ball after that number of frames
+const POINT_RESET: u64 = 180;
+const GRAVITY_AFTER: u64 = 180;
 
 pub struct GameState {
     rigid_body_set: RigidBodySet,
@@ -25,8 +37,9 @@ pub struct GameState {
     ccd_solver: CCDSolver,
     query_pipeline: QueryPipeline,
     physics_hooks: (),
-    event_handler: (),
+    event_handler: MyEventHandler,
 
+    frame_counter: u64,
     time: f32,
     game_time: f32,
     player1_handle: RigidBodyHandle,
@@ -41,11 +54,23 @@ pub struct GameState {
     right_wall_handle: ColliderHandle,
     middle_wall_handle: ColliderHandle,
 
+    points1: u32,
+    points2: u32,
+    points_added: bool,
+    ball_for_1: bool,
+    ball_touch: bool,
+    reset_frame: u64,
+    enable_gravity_frame: u64,
+    game_over: bool,
+    event_handler_receiver: Receiver<CollisionEvent>,
+
     player_input: HashMap<RigidBodyHandle, [bool; 2]>,
 }
 
 impl GameState {
     pub fn new() -> GameState {
+        let (sender, receiver) = channel();
+        let ball_touch_1 = rand::random();
         let mut game_state = GameState {
             rigid_body_set: RigidBodySet::new(),
             collider_set: ColliderSet::new(),
@@ -60,23 +85,34 @@ impl GameState {
             ccd_solver: CCDSolver::new(),
             query_pipeline: QueryPipeline::new(),
             physics_hooks: (),
-            event_handler: (),
+            event_handler: MyEventHandler{sender},
 
+            frame_counter: 0,
             time: 0.0,
             game_time: 0.0,
-            player1_handle: RigidBodyHandle::default(),
-            player2_handle: RigidBodyHandle::default(),
-            ball_handle: RigidBodyHandle::default(),
-            ground_handle: ColliderHandle::default(),
-            net_handle: ColliderHandle::default(),
-            player1_collider_handle: ColliderHandle::default(),
-            player2_collider_handle: ColliderHandle::default(),
-            ball_collider_handle: ColliderHandle::default(),
-            left_wall_handle: ColliderHandle::default(),
-            right_wall_handle: ColliderHandle::default(),
-            middle_wall_handle: ColliderHandle::default(),
+            player1_handle: Default::default(),
+            player2_handle: Default::default(),
+            ball_handle: Default::default(),
+            ground_handle: Default::default(),
+            net_handle: Default::default(),
+            player1_collider_handle: Default::default(),
+            player2_collider_handle: Default::default(),
+            ball_collider_handle: Default::default(),
+            left_wall_handle: Default::default(),
+            right_wall_handle: Default::default(),
+            middle_wall_handle: Default::default(),
 
-            player_input: HashMap::new(),
+            points1: 0,
+            points2: 0,
+            points_added: false,
+            ball_for_1: ball_touch_1,
+            ball_touch: ball_touch_1,
+            reset_frame: 0,
+            enable_gravity_frame: GRAVITY_AFTER,
+            game_over: false,
+            event_handler_receiver: receiver,
+
+            player_input: Default::default(),
         };
 
         // Create walls.
@@ -112,7 +148,7 @@ impl GameState {
 
         // Create the players
         let rigid_body = RigidBodyBuilder::dynamic()
-            .translation(vector![6.0, 3.0])
+            .translation(vector![START_PLAYER_1, START_PLAYER_HEIGHT])
             .build();
         let collider = ColliderBuilder::ball(0.5)
             .restitution(0.7)
@@ -123,7 +159,7 @@ impl GameState {
         game_state.player1_collider_handle = handle;
 
         let rigid_body = RigidBodyBuilder::dynamic()
-            .translation(vector![2.0, 3.0])
+            .translation(vector![START_PLAYER_2, START_PLAYER_HEIGHT])
             .build();
         let collider = ColliderBuilder::ball(0.5)
             .restitution(0.7)
@@ -136,15 +172,18 @@ impl GameState {
         game_state.player_input.insert(game_state.player1_handle, [false; 2]);
         game_state.player_input.insert(game_state.player2_handle, [false; 2]);
 
+        let ball_x = if game_state.ball_for_1 { START_BALL_1 } else { START_BALL_2 };
         // Create ball
         let rigid_body = RigidBodyBuilder::dynamic()
-            .translation(vector![4.0, 3.0])
+            .translation(vector![ball_x, START_BALL_HEIGHT])
+            .gravity_scale(0.0)
             .build();
         let collider = ColliderBuilder::ball(0.25)
             .restitution(0.8)
             .density(0.9)
             .restitution_combine_rule(CoefficientCombineRule::Max)
             .collision_groups(InteractionGroups::new(Group::GROUP_1, Group::GROUP_1))
+            .active_events(ActiveEvents::COLLISION_EVENTS)
             .build();
         game_state.ball_handle = game_state.rigid_body_set.insert(rigid_body);
         let handle = game_state.collider_set.insert_with_parent(collider, game_state.ball_handle, &mut game_state.rigid_body_set);
@@ -181,13 +220,16 @@ impl GameState {
         (pos.x, pos.y, size.x, size. y)
     }
 
-    pub fn step(&mut self, frame_time: f32) -> bool{
+    pub fn points(&self) -> (u32, u32, bool) {
+        (self.points1, self.points2, self.game_over)
+    }
+
+    pub fn step(&mut self, frame_time: f32) -> bool {
         self.time += frame_time;
         self.game_time += frame_time;
-        // let mut c = 0;
         let mut update_done = false;
         while self.time - TIME_STEP > 0.0 {
-            // c += 1;
+            self.frame_counter += 1;
             self.time -= TIME_STEP;
 
             self.control_player(self.player1_handle);
@@ -208,15 +250,123 @@ impl GameState {
                 &self.physics_hooks,
                 &self.event_handler,
             );
+
+            while let Ok(event) = self.event_handler_receiver.try_recv() {
+                match event {
+                    CollisionEvent::Started(handle1, handle2, _) => {
+                        // if [handle1, handle2].contains(&self.player1_collider_handle) || [handle1, handle2].contains(&self.player2_collider_handle) {
+                        //     self.ball_touch = BallTouch::None;
+                        // } else
+                        if [handle1, handle2].contains(&self.player1_collider_handle) {
+                            self.ball_touch = true;
+                            self.rigid_body_set[self.ball_handle].set_gravity_scale(1.0,true);
+                        }
+                        else if [handle1, handle2].contains(&self.player2_collider_handle) {
+                            self.ball_touch = false;
+                            self.rigid_body_set[self.ball_handle].set_gravity_scale(1.0,true);
+                        }
+                        else if [handle1, handle2].contains(&self.ground_handle) && !self.points_added {
+                            let add_point =
+                                if self.ball().0 < self.net().0 {
+                                    if self.ball_touch == false {
+                                        self.points1 += 1;
+                                        self.ball_for_1 = true;
+                                        true
+                                    }
+                                    else {
+                                        self.ball_touch = false;
+                                        false
+                                    }
+                                } else {
+                                    if self.ball_touch == true {
+                                        self.points2 += 1;
+                                        self.ball_for_1 = false;
+                                        true
+                                    }
+                                    else {
+                                        self.ball_touch = true;
+                                        false
+                                    }
+                                };
+                            if add_point {
+                                self.points_added = true;
+                                self.game_over = self.points1 >= POINT_LIMIT || self.points2 >= POINT_LIMIT;
+                                if !self.game_over {
+                                    self.reset_frame = self.frame_counter + POINT_RESET;
+                                }
+                            }
+                        }
+                    }
+                    CollisionEvent::Stopped(_, _, _) => {}
+                }
+            }
+
+            // if contact(&self.narrow_phase, self.ball_collider_handle, self.player1_collider_handle) ||
+            //     contact(&self.narrow_phase, self.ball_collider_handle, self.player2_collider_handle) {
+            //     println!("1 {:?} {}", self.ball_touch, self.frame_counter);
+            //     self.ball_touch = BallTouch::None;
+            // }
+            //
+            // if contact(&self.narrow_phase, self.ball_collider_handle, self.ground_handle) && !self.points_added {
+            //     println!("200 {:?} {}", self.ball_touch, self.frame_counter);
+            //     let add_point =
+            //         if self.ball().0 < self.net().0 {
+            //             if self.ball_touch == BallTouch::Left {
+            //                 self.points1 += 1;
+            //                 self.ball_for_1 = true;
+            //                 true
+            //             }
+            //             else {
+            //                 self.ball_touch = BallTouch::Left;
+            //                 false
+            //             }
+            //         } else {
+            //             if self.ball_touch == BallTouch::Right {
+            //                 self.points2 += 1;
+            //                 self.ball_for_1 = false;
+            //                 true
+            //             }
+            //             else {
+            //                 self.ball_touch = BallTouch::Right;
+            //                 false
+            //             }
+            //         };
+            //     if add_point {
+            //         self.points_added = true;
+            //         self.game_over = self.points1 >= POINT_LIMIT || self.points2 >= POINT_LIMIT;
+            //         if !self.game_over {
+            //             self.reset_frame = self.frame_counter + POINT_RESET;
+            //         }
+            //     }
+            // }
+
+            if self.frame_counter == self.reset_frame {
+                self.points_added = false;
+                self.ball_touch = self.ball_for_1;
+                self.player_input.insert(self.player1_handle, [false, false]);
+                self.player_input.insert(self.player2_handle, [false, false]);
+                self.rigid_body_set[self.player1_handle].set_translation(vector![START_PLAYER_1, START_PLAYER_HEIGHT], true);
+                self.rigid_body_set[self.player2_handle].set_translation(vector![START_PLAYER_2, START_PLAYER_HEIGHT], true);
+                self.rigid_body_set[self.player1_handle].set_linvel(vector![0.0, 0.0], true);
+                self.rigid_body_set[self.player2_handle].set_linvel(vector![0.0, 0.0], true);
+                self.rigid_body_set[self.player1_handle].reset_forces(true);
+                self.rigid_body_set[self.player2_handle].reset_forces(true);
+                let ball = &mut self.rigid_body_set[self.ball_handle];
+                ball.set_gravity_scale(0.0, true);
+                let ball_x = if self.ball_for_1 {START_BALL_1} else {START_BALL_2};
+                ball.set_translation(vector![ball_x, START_BALL_HEIGHT], true);
+                ball.reset_forces(true);
+                ball.set_linvel(vector![0.0, 0.0], true);
+                ball.set_angvel(0.0, true);
+                self.enable_gravity_frame = self.frame_counter + GRAVITY_AFTER;
+            }
+            else if self.frame_counter == self.enable_gravity_frame {
+                self.rigid_body_set[self.ball_handle].set_gravity_scale(1.0,true);
+                self.rigid_body_set[self.ball_handle].apply_impulse(vector![0.0, -0.1], true);
+            }
+
             update_done = true;
         }
-        // println!("counter {}", c);
-
-        // let player1_body = &self.rigid_body_set[self.player1_handle];
-        // println!("ang vel: {}", player1_body.angvel());
-        // println!("line vel: {}", player1_body.linvel());
-        // println!("forces {}", player1_body.user_force());
-        // println!("time {}", self.game_time);
 
         update_done
     }
@@ -291,6 +441,20 @@ impl GameState {
         else {
             self.player_input.insert(handle, [false, right]);
         }
+    }
+}
+
+struct MyEventHandler {
+    sender: Sender<CollisionEvent>
+}
+
+impl EventHandler for MyEventHandler {
+    fn handle_collision_event(&self, bodies: &RigidBodySet, colliders: &ColliderSet, event: CollisionEvent, contact_pair: Option<&ContactPair>) {
+        let _ = self.sender.send(event);
+    }
+
+    fn handle_contact_force_event(&self, dt: Real, bodies: &RigidBodySet, colliders: &ColliderSet, contact_pair: &ContactPair, total_force_magnitude: Real) {
+        log::error!("Force event handler not implemented");
     }
 }
 

@@ -16,12 +16,10 @@ pub fn start(socket: UdpSocket, logic_sender: Sender<LogicMessage>) {
                         Ok(()) => {}
                         Err(e) => log::error!("Cannot send player message, {e}")
                     },
-                    Err(e) => log::warn!("parse error")
+                    Err(e) => log::warn!("parse error: {e:?}")
                 };
             }
-            Err(e) => {
-                log::error!("Error receiving data: {}", e);
-            }
+            Err(e) => log::error!("Error receiving data, kind: {}, error: {e}", {e.kind()})
         }
     }
 }
@@ -66,7 +64,8 @@ pub enum Key {
 #[derive(Debug, PartialEq)]
 pub enum MsgIn {
     GameRequest,
-    Input(u64, u64, Key)
+    Input(u64, u64, Key),
+    Ping(u64, u64),
 }
 
 #[derive(Debug, PartialEq)]
@@ -87,6 +86,7 @@ fn parse_packet(data: &[u8]) -> Result<MsgIn, ParseError> {
             [37, 31] => Ok(MsgIn::Input(player_id, board_id, Key::Right(true))),
             [67, 58] => Ok(MsgIn::Input(player_id, board_id, Key::Right(false))),
             [97, 33] => Ok(MsgIn::Input(player_id, board_id, Key::Jump)),
+            [96, 22] => Ok(MsgIn::Ping(player_id, board_id)),
             _ => Err(ParseError)
         }
     }
@@ -114,7 +114,7 @@ fn parse_to_packet(state: &GameStateSerialized) -> [u8; 32] {
 
 mod test {
     use crate::udp_server::Key::{Jump, Left, Right};
-    use crate::udp_server::MsgIn::{GameRequest, Input};
+    use crate::udp_server::MsgIn::{GameRequest, Input, Ping};
     use crate::udp_server::{parse_packet, ParseError};
 
     #[test]
@@ -130,5 +130,6 @@ mod test {
         assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[37, 31], &99u64.to_be_bytes(), &one, &[0; 8]].concat()), Ok(Input(99, 1, Right(true))));
         assert_eq!(parse_packet(&[58, 41, 58, 80, 58, 68, 67, 58, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]), Ok(Input(258, 1, Right(false))));
         assert_eq!(parse_packet(&[58, 41, 58, 80, 58, 68, 97, 33, 0, 0, 0, 0, 0, 1, 0, 7, 0, 0, 0, 0, 0, 1, 49, 163, 0, 0, 0, 0, 0, 0, 0, 0]), Ok(Input(65543, 78243, Jump)));
+        assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[96, 22], &[0; 7], &[197], &one, &[0; 8]].concat()), Ok(Ping(197, 1)));
     }
 }
