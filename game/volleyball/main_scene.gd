@@ -7,15 +7,20 @@ var msg = [58, 41, 58, 80, 58, 68, 11, 13, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 var player_id = PackedByteArray()
 var board_id = PackedByteArray()
 var ping_time = 0
+var game_time = 0
 
 # send ping every 2 seconds
 const PING_FREQ = 2.0
+
+var wait_label_text = "Waiting for another player to join"
+var label_change = 0
 
 
 func _ready() -> void:
 	socket = PacketPeerUDP.new()
 	socket.bind(12001)
-	socket.set_dest_address("127.0.0.1", 12542)
+	#socket.set_dest_address("127.0.0.1", 12542)
+	socket.set_dest_address("20.215.201.30", 12542)
 	socket.put_packet(msg)
 	print("packet sent")
 	
@@ -27,6 +32,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	#print("delta ", delta, ' ', 1/delta)
 	ping_time += delta
+	game_time += delta
 	#print("ping time", ping_time)
 	if ping_time >= PING_FREQ:
 		ping_time = 0
@@ -34,6 +40,14 @@ func _process(delta: float) -> void:
 		msg[7] = 22
 		socket.put_packet(msg)
 		#print("ping sent")
+	
+	var t = int(game_time)
+	if label_change != t:
+		if $wait_label.text.contains("..."):
+			$wait_label.text = wait_label_text
+		else:
+			$wait_label.text += '.'
+		label_change = t
 		
 	#print('message count: ', socket.get_available_packet_count())
 	while socket.get_available_packet_count() > 0:
@@ -49,6 +63,7 @@ func _process(delta: float) -> void:
 				msg[i + 8] = player_id[i]
 				msg[i + 16] = board_id[i]
 		else:
+			$wait_label.visible = false
 			#print(packet)
 			var ball_r = packet.decode_float(0)
 			var ball_x = packet.decode_float(4)

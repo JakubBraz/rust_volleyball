@@ -10,6 +10,7 @@ todo
 - should there be a pre-game while waiting in the lobby? in that case server must send an indicator if the second player is available
 - server cleans up and finishes games after the game over
 - add statistics, how many players connected, how many active games (just print HashMap len)
+- if player reconnects too fast (within the current 5 sec ping time), client crashed, message is shorter than 40 bytes
  */
 
 fn main() {

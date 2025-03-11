@@ -160,3 +160,11 @@ offset_bottom = 337.0
 theme_override_font_sizes/font_size = 100
 text = "Green won!"
 horizontal_alignment = 1
+
+[node name="wait_label" type="Label" parent="."]
+offset_left = 150.0
+offset_top = 200.0
+offset_right = 952.0
+offset_bottom = 269.0
+theme_override_font_sizes/font_size = 50
+text = "Waiting for another player to join"
