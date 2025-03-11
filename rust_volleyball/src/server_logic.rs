@@ -17,9 +17,12 @@ pub enum LogicMessage {
 pub struct GameStateSerialized {
     pub ball_pos: (f32, f32),
     pub ball_radius: f32,
+    // pub ball_angle: f32,
     pub player_radius: f32,
     pub player1_pos: (f32, f32),
     pub player2_pos: (f32, f32),
+    // pub score1: u32,
+    // pub score2: u32,
 }
 
 pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicMessage>, udp_sender: Sender<SenderMsg>) {

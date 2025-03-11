@@ -77,8 +77,8 @@ fn parse_packet(data: &[u8]) -> Result<MsgIn, ParseError> {
         Err(ParseError)
     }
     else {
-        let player_id = u64::from_be_bytes(data[8..16].try_into().unwrap());
-        let board_id = u64::from_be_bytes(data[16..24].try_into().unwrap());
+        let player_id = u64::from_le_bytes(data[8..16].try_into().unwrap());
+        let board_id = u64::from_le_bytes(data[16..24].try_into().unwrap());
         match data[6..8] {
             [11, 13] => Ok(MsgIn::GameRequest),
             [17, 23] => Ok(MsgIn::Input(player_id, board_id, Key::Left(true))),
@@ -95,20 +95,20 @@ fn parse_packet(data: &[u8]) -> Result<MsgIn, ParseError> {
 fn parse_ids_to_packet(client_id: u64, board_id: u64) -> [u8; 32]{
     let mut result = [0; 32];
     result[..4].copy_from_slice(&[12, 64, 13, 56]);
-    result[4..12].copy_from_slice(&client_id.to_be_bytes());
-    result[12..20].copy_from_slice(&board_id.to_be_bytes());
+    result[4..12].copy_from_slice(&client_id.to_le_bytes());
+    result[12..20].copy_from_slice(&board_id.to_le_bytes());
     result
 }
 
 fn parse_to_packet(state: &GameStateSerialized) -> [u8; 32] {
-    let ball_r = state.ball_radius.to_be_bytes();
-    let ball_x = state.ball_pos.0.to_be_bytes();
-    let ball_y = state.ball_pos.1.to_be_bytes();
-    let player_r = state.player_radius.to_be_bytes();
-    let player1_x = state.player1_pos.0.to_be_bytes();
-    let player1_y = state.player1_pos.1.to_be_bytes();
-    let player2_x = state.player2_pos.0.to_be_bytes();
-    let player2_y = state.player2_pos.1.to_be_bytes();
+    let ball_r = state.ball_radius.to_le_bytes();
+    let ball_x = state.ball_pos.0.to_le_bytes();
+    let ball_y = state.ball_pos.1.to_le_bytes();
+    let player_r = state.player_radius.to_le_bytes();
+    let player1_x = state.player1_pos.0.to_le_bytes();
+    let player1_y = state.player1_pos.1.to_le_bytes();
+    let player2_x = state.player2_pos.0.to_le_bytes();
+    let player2_y = state.player2_pos.1.to_le_bytes();
     [ball_r, ball_x, ball_y, player_r, player1_x, player1_y, player2_x, player2_y].concat().try_into().unwrap()
 }
 
@@ -119,17 +119,17 @@ mod test {
 
     #[test]
     fn test_parse_packet() {
-        let one = 1u64.to_be_bytes();
+        let one = 1u64.to_le_bytes();
         assert_eq!(parse_packet(&[13, 14]), Err(ParseError));
         assert_eq!(parse_packet(&[13, 14, 31, 43, 53]), Err(ParseError));
         assert_eq!(parse_packet(&[]), Err(ParseError));
         assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[11, 13]].concat()), Err(ParseError));
         assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[11, 13], &[0; 8], &[0; 16]].concat()), Ok(GameRequest));
         assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[17, 23], &one, &one, &[0; 8]].concat()), Ok(Input(1, 1, Left(true))));
-        assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[25, 99], &99u64.to_be_bytes(), &one, &[0; 8]].concat()), Ok(Input(99, 1, Left(false))));
-        assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[37, 31], &99u64.to_be_bytes(), &one, &[0; 8]].concat()), Ok(Input(99, 1, Right(true))));
-        assert_eq!(parse_packet(&[58, 41, 58, 80, 58, 68, 67, 58, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]), Ok(Input(258, 1, Right(false))));
-        assert_eq!(parse_packet(&[58, 41, 58, 80, 58, 68, 97, 33, 0, 0, 0, 0, 0, 1, 0, 7, 0, 0, 0, 0, 0, 1, 49, 163, 0, 0, 0, 0, 0, 0, 0, 0]), Ok(Input(65543, 78243, Jump)));
-        assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[96, 22], &[0; 7], &[197], &one, &[0; 8]].concat()), Ok(Ping(197, 1)));
+        assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[25, 99], &99u64.to_le_bytes(), &one, &[0; 8]].concat()), Ok(Input(99, 1, Left(false))));
+        assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[37, 31], &99u64.to_le_bytes(), &one, &[0; 8]].concat()), Ok(Input(99, 1, Right(true))));
+        assert_eq!(parse_packet(&[58, 41, 58, 80, 58, 68, 67, 58, 2, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), Ok(Input(258, 1, Right(false))));
+        assert_eq!(parse_packet(&[58, 41, 58, 80, 58, 68, 97, 33, 7, 0, 1, 0, 0, 0, 0, 0, 163, 49, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), Ok(Input(65543, 78243, Jump)));
+        assert_eq!(parse_packet(&[b":):P:D".as_slice(), &[96, 22], &[197], &[0; 7], &one, &[0; 8]].concat()), Ok(Ping(197, 1)));
     }
 }

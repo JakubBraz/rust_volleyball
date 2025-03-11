@@ -3,6 +3,15 @@ use std::sync::mpsc::channel;
 use std::thread::spawn;
 use rust_volleyball::{server_logic, tcp_server, udp_server};
 
+/*
+todo
+- server sends player_id and board_id only in the first packet, should it send the same packet every time (containing the ids)?
+- player in lobby never disconnects, lobby with a player is created forever. server should include udp pings for lobby too, or use tcp based sessions
+- should there be a pre-game while waiting in the lobby? in that case server must send an indicator if the second player is available
+- server cleans up and finishes games after the game over
+- add statistics, how many players connected, how many active games (just print HashMap len)
+ */
+
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::new().default_filter_or("debug"))
         .format_timestamp(Some(env_logger::TimestampPrecision::Millis))

@@ -146,7 +146,7 @@ impl GameState {
             .build();
         game_state.net_handle = game_state.collider_set.insert(collider);
 
-        // Create the players
+        // Create players
         let rigid_body = RigidBodyBuilder::dynamic()
             .translation(vector![START_PLAYER_1, START_PLAYER_HEIGHT])
             .build();
