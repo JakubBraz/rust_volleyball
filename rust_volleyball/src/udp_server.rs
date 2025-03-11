@@ -100,16 +100,20 @@ fn parse_ids_to_packet(client_id: u64, board_id: u64) -> [u8; 32]{
     result
 }
 
-fn parse_to_packet(state: &GameStateSerialized) -> [u8; 32] {
-    let ball_r = state.ball_radius.to_le_bytes();
-    let ball_x = state.ball_pos.0.to_le_bytes();
-    let ball_y = state.ball_pos.1.to_le_bytes();
-    let player_r = state.player_radius.to_le_bytes();
-    let player1_x = state.player1_pos.0.to_le_bytes();
-    let player1_y = state.player1_pos.1.to_le_bytes();
-    let player2_x = state.player2_pos.0.to_le_bytes();
-    let player2_y = state.player2_pos.1.to_le_bytes();
-    [ball_r, ball_x, ball_y, player_r, player1_x, player1_y, player2_x, player2_y].concat().try_into().unwrap()
+fn parse_to_packet(state: &GameStateSerialized) -> [u8; 64] {
+    let mut packet = [0; 64];
+    packet[..4].copy_from_slice(&state.ball_radius.to_le_bytes());
+    packet[4..8].copy_from_slice(&state.ball_pos.0.to_le_bytes());
+    packet[8..12].copy_from_slice(&state.ball_pos.1.to_le_bytes());
+    packet[12..16].copy_from_slice(&state.player_radius.to_le_bytes());
+    packet[16..20].copy_from_slice(&state.player1_pos.0.to_le_bytes());
+    packet[20..24].copy_from_slice(&state.player1_pos.1.to_le_bytes());
+    packet[24..28].copy_from_slice(&state.player2_pos.0.to_le_bytes());
+    packet[28..32].copy_from_slice(&state.player2_pos.1.to_le_bytes());
+    packet[32..36].copy_from_slice(&state.score1.to_le_bytes());
+    packet[36..40].copy_from_slice(&state.score2.to_le_bytes());
+    packet[40] = if state.game_over { 1 } else { 0 };
+    packet
 }
 
 mod test {

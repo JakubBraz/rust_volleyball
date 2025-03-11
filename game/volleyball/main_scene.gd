@@ -21,6 +21,7 @@ func _ready() -> void:
 	
 	players_fixed_axis = $player1.position[0]
 	ball_fixed_axis = $ball.position[0]
+	$game_over.visible = false
 
 
 func _process(delta: float) -> void:
@@ -57,10 +58,22 @@ func _process(delta: float) -> void:
 			var p1_y = packet.decode_float(20)
 			var p2_x = packet.decode_float(24)
 			var p2_y = packet.decode_float(28)
-			#print("%f %f %f" % [ball_r, ball_x, ball_y])
+			var score1 = packet.decode_u32(32)
+			var score2 = packet.decode_u32(36)
+			var game_over = true if packet[40] == 1 else false
+			#print(score1, " ", score2, " ", game_over)
+			$score1.text = str(score1)
+			$score2.text = str(score2)
 			$ball.position = Vector3(ball_fixed_axis, ball_y, ball_x)
 			$player1.position = Vector3(players_fixed_axis, p1_y, p1_x)
 			$player2.position = Vector3(players_fixed_axis, p2_y, p2_x)
+			
+			if score1 >= 10:
+				$game_over.text = "Green won!"
+				$game_over.visible = true
+			if score2 >= 10:
+				$game_over.text = "Blue won!"
+				$game_over.visible = true
 	
 	#[11, 13] => Ok(MsgIn::GameRequest),
 	#[17, 23] => Ok(MsgIn::Input(player_id, board_id, Key::Left(true))),

@@ -21,8 +21,9 @@ pub struct GameStateSerialized {
     pub player_radius: f32,
     pub player1_pos: (f32, f32),
     pub player2_pos: (f32, f32),
-    // pub score1: u32,
-    // pub score2: u32,
+    pub score1: u32,
+    pub score2: u32,
+    pub game_over: bool,
 }
 
 pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicMessage>, udp_sender: Sender<SenderMsg>) {
@@ -48,12 +49,16 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                                 if board_updated {
                                     let (bx, by, br) = board.ball();
                                     let (p1x, p1y, p1r, p2x, p2y, _p2r) = board.players();
+                                    let (score1, score2, game_over) = board.points();
                                     let serialized = GameStateSerialized {
                                         ball_pos: (bx, by),
                                         ball_radius: br,
                                         player_radius: p1r,
                                         player1_pos: (p1x, p1y),
                                         player2_pos: (p2x, p2y),
+                                        score1,
+                                        score2,
+                                        game_over
                                     };
                                     notify(&ping_time, player1, &udp_sender, serialized);
                                     notify(&ping_time, player2, &udp_sender, serialized);
