@@ -192,20 +192,20 @@ impl GameState {
         game_state
     }
 
-    pub fn players(&self) -> (f32, f32, f32, f32, f32, f32) {
+    pub fn players(&self) -> (f32, f32, f32, f32, f32, f32, f32, f32, f32, f32) {
         let body1 = &self.rigid_body_set[self.player1_handle];
         let t1 = body1.translation();
         let r1 = self.collider_set[body1.colliders()[0]].shape().as_ball().unwrap().radius;
         let body2 = &self.rigid_body_set[self.player2_handle];
         let t2 = body2.translation();
         let r2 = self.collider_set[body2.colliders()[0]].shape().as_ball().unwrap().radius;
-        (t1.x, t1.y, r1, t2.x, t2.y, r2)
+        (t1.x, t1.y, r1, body1.linvel().x, body1.linvel().y, t2.x, t2.y, r2, body2.linvel().x, body2.linvel().y)
     }
 
-    pub fn ball(&self) -> (f32, f32, f32) {
+    pub fn ball(&self) -> (f32, f32, f32, f32, f32) {
         let body = &self.rigid_body_set[self.ball_handle];
         let r = self.collider_set[body.colliders()[0]].shape().as_ball().unwrap().radius;
-        (body.translation().x, body.translation().y, r)
+        (body.translation().x, body.translation().y, r, body.linvel().x, body.linvel().y)
     }
 
     pub fn ground(&self) -> (f32, f32, f32, f32) {

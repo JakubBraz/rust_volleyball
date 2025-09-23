@@ -15,12 +15,16 @@ const PING_FREQ = 2.0
 var wait_label_text = "Waiting for another player to join"
 var label_change = 0
 
+var file: FileAccess
+var game_states = []
+var last_game_state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 func _ready() -> void:
 	socket = PacketPeerUDP.new()
 	socket.bind(12001)
-	#socket.set_dest_address("127.0.0.1", 12542)
-	socket.set_dest_address("20.215.201.30", 12542)
+	#socket.set_dest_address("192.168.1.100", 12542)
+	socket.set_dest_address("127.0.0.1", 12542)
+	#socket.set_dest_address("20.215.201.30", 12542)
 	socket.put_packet(msg)
 	print("packet sent")
 	
@@ -76,12 +80,39 @@ func _process(delta: float) -> void:
 			var score1 = packet.decode_u32(32)
 			var score2 = packet.decode_u32(36)
 			var game_over = true if packet[40] == 1 else false
+			var p1_vx = packet.decode_float(41)
+			var p1_vy = packet.decode_float(45)
+			var p2_vx = packet.decode_float(49)
+			var p2_vy = packet.decode_float(53)
+			var b_vx = packet.decode_float(57)
+			var b_vy = packet.decode_float(61)
+			last_game_state[0] = ball_x
+			last_game_state[1] = ball_y
+			last_game_state[2] = b_vx
+			last_game_state[3] = b_vy
+			last_game_state[4] = p1_x
+			last_game_state[5] = p1_y
+			last_game_state[6] = p1_vx
+			last_game_state[7] = p1_vy
+			last_game_state[8] = p2_x
+			last_game_state[9] = p2_y
+			last_game_state[10] = p2_vx
+			last_game_state[11] = p2_vy
+			#print("last game state ", last_game_state)
 			#print(score1, " ", score2, " ", game_over)
 			$score1.text = str(score1)
 			$score2.text = str(score2)
 			$ball.position = Vector3(ball_fixed_axis, ball_y, ball_x)
 			$player1.position = Vector3(players_fixed_axis, p1_y, p1_x)
 			$player2.position = Vector3(players_fixed_axis, p2_y, p2_x)
+			
+			if (score1 >= 10 || score2 >= 10) && $game_over.visible == false:
+				print("saving learning data")
+				var r = randi_range(0, 1_000_000)
+				file = FileAccess.open("learning_data/learning_data_" + str(r), FileAccess.WRITE)
+				for x in game_states:
+					file.store_line(str(x))
+				file.close()
 			
 			if score1 >= 10:
 				$game_over.text = "Green won!"
@@ -102,22 +133,35 @@ func _process(delta: float) -> void:
 		msg[6] = 17
 		msg[7] = 23
 		socket.put_packet(msg)
+		game_states.append(last_game_state.duplicate())
+		game_states.append(1)
 	elif Input.is_action_just_released("ui_left"):
 		msg[6] = 25
 		msg[7] = 99
 		socket.put_packet(msg)
+		game_states.append(last_game_state.duplicate())
+		game_states.append(2)
 	elif Input.is_action_just_pressed("ui_right"):
 		msg[6] = 37
 		msg[7] = 31
 		socket.put_packet(msg)
+		game_states.append(last_game_state.duplicate())
+		game_states.append(3)
 	elif Input.is_action_just_released("ui_right"):
 		msg[6] = 67
 		msg[7] = 58
 		socket.put_packet(msg)
+		game_states.append(last_game_state.duplicate())
+		game_states.append(4)
 	elif Input.is_action_just_pressed("ui_up"):
 		msg[6] = 97
 		msg[7] = 33
 		socket.put_packet(msg)
+		game_states.append(last_game_state.duplicate())
+		game_states.append(5)
+	elif $wait_label.visible == false:
+		game_states.append(last_game_state.duplicate())
+		game_states.append(0)
 		
 	if Input.is_action_just_pressed("my_key_1"):
 		print("set camera 1")

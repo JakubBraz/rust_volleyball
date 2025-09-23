@@ -100,8 +100,8 @@ fn parse_ids_to_packet(client_id: u64, board_id: u64) -> [u8; 32]{
     result
 }
 
-fn parse_to_packet(state: &GameStateSerialized) -> [u8; 64] {
-    let mut packet = [0; 64];
+fn parse_to_packet(state: &GameStateSerialized) -> [u8; 128] {
+    let mut packet = [0; 128];
     packet[..4].copy_from_slice(&state.ball_radius.to_le_bytes());
     packet[4..8].copy_from_slice(&state.ball_pos.0.to_le_bytes());
     packet[8..12].copy_from_slice(&state.ball_pos.1.to_le_bytes());
@@ -113,6 +113,12 @@ fn parse_to_packet(state: &GameStateSerialized) -> [u8; 64] {
     packet[32..36].copy_from_slice(&state.score1.to_le_bytes());
     packet[36..40].copy_from_slice(&state.score2.to_le_bytes());
     packet[40] = if state.game_over { 1 } else { 0 };
+    packet[41..45].copy_from_slice(&state.player1_v.0.to_le_bytes());
+    packet[45..49].copy_from_slice(&state.player1_v.1.to_le_bytes());
+    packet[49..53].copy_from_slice(&state.player2_v.0.to_le_bytes());
+    packet[53..57].copy_from_slice(&state.player2_v.1.to_le_bytes());
+    packet[57..61].copy_from_slice(&state.ball_v.0.to_le_bytes());
+    packet[61..65].copy_from_slice(&state.ball_v.1.to_le_bytes());
     packet
 }
 

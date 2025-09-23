@@ -1,0 +1,7 @@
+[package]
+name = "ai_train"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+neural_network = {path = "../../neural_network/project"}

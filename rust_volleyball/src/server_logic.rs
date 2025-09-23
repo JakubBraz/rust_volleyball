@@ -24,6 +24,9 @@ pub struct GameStateSerialized {
     pub score1: u32,
     pub score2: u32,
     pub game_over: bool,
+    pub player1_v: (f32, f32),
+    pub player2_v: (f32, f32),
+    pub ball_v: (f32, f32),
 }
 
 pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicMessage>, udp_sender: Sender<SenderMsg>) {
@@ -47,8 +50,8 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                                 update_queue.push_back((Instant::now(), board_id));
 
                                 if board_updated {
-                                    let (bx, by, br) = board.ball();
-                                    let (p1x, p1y, p1r, p2x, p2y, _p2r) = board.players();
+                                    let (bx, by, br, bvx, bvy) = board.ball();
+                                    let (p1x, p1y, p1r, p1vx, p1vy, p2x, p2y, _p2r, p2vx, p2vy) = board.players();
                                     let (score1, score2, game_over) = board.points();
                                     let serialized = GameStateSerialized {
                                         ball_pos: (bx, by),
@@ -58,7 +61,10 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                                         player2_pos: (p2x, p2y),
                                         score1,
                                         score2,
-                                        game_over
+                                        game_over,
+                                        player1_v: (p1vx, p1vy),
+                                        player2_v: (p2vx, p2vy),
+                                        ball_v: (bvx, bvy),
                                     };
                                     notify(&ping_time, player1, &udp_sender, serialized);
                                     notify(&ping_time, player2, &udp_sender, serialized);
