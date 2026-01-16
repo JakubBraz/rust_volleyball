@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
-use log::error;
+use log::{debug, error};
 use rand::Rng;
 use tokio::sync::mpsc::UnboundedSender;
 use crate::GameState;
@@ -33,8 +33,6 @@ pub struct GameStateSerialized {
 pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicMessage>, udp_sender: Sender<SenderMsg>) {
     let mut player_in_lobby: Option<(u64, u64)> = None;
     let mut boards: HashMap<u64, (u64, u64, GameState)> = HashMap::new();
-    // todo remove the queue
-    let mut update_queue: VecDeque<(Instant, u64)> = VecDeque::new();
     let mut player_channels: HashMap<u64, UnboundedSender<TcpMessage>> = HashMap::new();
     let mut rng = rand::rng();
 
@@ -42,43 +40,31 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
         match logic_receiver.recv() {
             Ok(m) => match m {
                 LogicMessage::CalculateBoard => {
-                    match update_queue.pop_front() {
-                        None => {}
-                        Some((last_update, board_id)) => match boards.get_mut(&board_id) {
-                            None => log::error!("Board {board_id} not found"),
-                            Some((player1, player2, board)) => {
-                                if player_channels.contains_key(&player1) && player_channels.contains_key(&player2) {
-                                    // is it ok to calculate Instant twice here?
-                                    let board_updated = board.step(last_update.elapsed().as_secs_f32());
-                                    update_queue.push_back((Instant::now(), board_id));
-
-                                    if board_updated {
-                                        let (bx, by, br) = board.ball();
-                                        let (p1x, p1y, p1r, p2x, p2y, _p2r) = board.players();
-                                        let (score1, score2, game_over) = board.points();
-                                        let serialized = GameStateSerialized {
-                                            ball_pos: (bx, by),
-                                            ball_radius: br,
-                                            player_radius: p1r,
-                                            player1_pos: (p1x, p1y),
-                                            player2_pos: (p2x, p2y),
-                                            score1,
-                                            score2,
-                                            game_over
-                                        };
-                                        notify(&udp_sender, SenderMsg::GameLogicState(*player1, serialized));
-                                        notify(&udp_sender, SenderMsg::GameLogicState(*player2, serialized));
-                                    }
-
-                                    // todo clean after game finishes
-                                }
-                            }
+                    boards.retain(|_board_id, (player1, player2, board)| {
+                        if !player_channels.contains_key(player1) && !player_channels.contains_key(player2) {
+                            false
                         }
-                    };
-                    match logic_sender.send(LogicMessage::CalculateBoard) {
-                        Ok(()) => {}
-                        Err(e) => log::error!("Cannot send CalculateBoard, {e}")
-                    }
+                        else {
+                            if board.step() {
+                                let (bx, by, br) = board.ball();
+                                let (p1x, p1y, p1r, p2x, p2y, _p2r) = board.players();
+                                let (score1, score2, game_over) = board.points();
+                                let serialized = GameStateSerialized {
+                                    ball_pos: (bx, by),
+                                    ball_radius: br,
+                                    player_radius: p1r,
+                                    player1_pos: (p1x, p1y),
+                                    player2_pos: (p2x, p2y),
+                                    score1,
+                                    score2,
+                                    game_over
+                                };
+                                notify(&udp_sender, SenderMsg::GameLogicState(*player1, serialized));
+                                notify(&udp_sender, SenderMsg::GameLogicState(*player2, serialized));
+                            }
+                            true
+                        }
+                    });
                 }
                 LogicMessage::SetChannel(player_id, channel) => {
                     player_channels.insert(player_id, channel);
@@ -94,14 +80,9 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                             Some((waiting_player_id, board_id)) => {
                                 let game = GameState::new();
                                 boards.insert(board_id, (waiting_player_id, player_id, game));
-                                update_queue.push_back((Instant::now(), board_id));
                                 player_in_lobby = None;
                                 send_tcp_message(&player_channels, player_id, TcpMessage::SetOpponent(waiting_player_id));
                                 send_tcp_message(&player_channels, waiting_player_id, TcpMessage::SetOpponent(player_id));
-                                match logic_sender.send(LogicMessage::CalculateBoard) {
-                                    Ok(()) => {}
-                                    Err(e) => log::error!("Cannot send CalculateBoard, {e}")
-                                }
                                 (player_id, board_id)
                             }
                         };

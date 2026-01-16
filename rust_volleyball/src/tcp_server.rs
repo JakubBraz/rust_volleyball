@@ -30,28 +30,41 @@ async fn run(sender: Sender<LogicMessage>) {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:12541").await.expect("Cannot bind");
     // todo is unwrap safe on Arc<Mutex<u64>> in this case?
     let counter: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
+
+    // let mut game_logic_timer = tokio::time::interval(Duration::from_secs_f32(1.0 / 60.0));
+    // let mut game_logic_timer = tokio::time::interval(Duration::from_secs_f32(1.0 / 70.0));
+    // let mut game_logic_timer = tokio::time::interval(Duration::from_secs_f32(1.0 / 30.0));
+    let mut game_logic_timer = tokio::time::interval(Duration::from_secs_f32(1.0 / 100.0));
+    let sender_clone = sender.clone();
+
     loop {
-        log::debug!("Waiting for connections...");
-        match listener.accept().await {
-            Ok((stream, addr)) => {
-                let logic_sender = sender.clone();
-                let counter_clone = Arc::clone(&counter);
-                tokio::spawn(async move {
-                    {
-                        let mut c = counter_clone.lock().unwrap();
-                        *c += 1;
-                        log::debug!("TCP connection, counter: {c}");
-                    }
-                    handle_connection(stream, addr, logic_sender).await;
-                    {
-                        let mut c = counter_clone.lock().unwrap();
-                        *c -= 1;
-                        log::debug!("TCP disconnection, counter: {c:?}");
-                    }
-                });
+        tokio::select! {
+            _ = game_logic_timer.tick() => {
+                if let Err(e) = sender_clone.send(LogicMessage::CalculateBoard) {
+                    log::error!("Cannot send GameLogic tick");
+                }
             }
-            Err(e) => {
-                log::error!("Could not accept connection: {}", e);
+            incoming = listener.accept() => match incoming {
+                Ok((stream, addr)) => {
+                    let logic_sender = sender.clone();
+                    let counter_clone = Arc::clone(&counter);
+                    tokio::spawn(async move {
+                        {
+                            let mut c = counter_clone.lock().unwrap();
+                            *c += 1;
+                            log::debug!("TCP connection, counter: {c}");
+                        }
+                        handle_connection(stream, addr, logic_sender).await;
+                        {
+                            let mut c = counter_clone.lock().unwrap();
+                            *c -= 1;
+                            log::debug!("TCP disconnection, counter: {c:?}");
+                        }
+                    });
+                }
+                Err(e) => {
+                    log::error!("Could not accept connection: {}", e);
+                }
             }
         }
     }

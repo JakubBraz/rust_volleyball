@@ -4,6 +4,7 @@ pub mod server_logic;
 
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Instant;
 use rapier2d::prelude::*;
 
 const TIME_STEP: f32 = 1.0 / 60.0;
@@ -42,6 +43,7 @@ pub struct GameState {
     frame_counter: u64,
     time: f32,
     game_time: f32,
+    last_update: Instant,
     player1_handle: RigidBodyHandle,
     player2_handle: RigidBodyHandle,
     ball_handle: RigidBodyHandle,
@@ -90,6 +92,7 @@ impl GameState {
             frame_counter: 0,
             time: 0.0,
             game_time: 0.0,
+            last_update: Instant::now(),
             player1_handle: Default::default(),
             player2_handle: Default::default(),
             ball_handle: Default::default(),
@@ -224,7 +227,9 @@ impl GameState {
         (self.points1, self.points2, self.game_over)
     }
 
-    pub fn step(&mut self, frame_time: f32) -> bool {
+    pub fn step(&mut self) -> bool {
+        let frame_time = self.last_update.elapsed().as_secs_f32();
+        // log::debug!("frame elapsed: {}", frame_time);
         self.time += frame_time;
         self.game_time += frame_time;
         let mut update_done = false;
@@ -367,7 +372,7 @@ impl GameState {
 
             update_done = true;
         }
-
+        self.last_update = Instant::now();
         update_done
     }
 

@@ -62,7 +62,7 @@ async fn main() {
         }
 
         // UPDATE STATE
-        game_state.step(get_frame_time());
+        game_state.step();
 
         // DRAW STATE
         clear_background(Color::new(0.2, 0.5, 0.7, 1.0));

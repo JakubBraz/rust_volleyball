@@ -51,6 +51,7 @@ async fn main() {
 
     socket.set_read_timeout(Some(Duration::from_millis(30))).unwrap();
     tcp_socket.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
+    // let mut t = Instant::now();
     loop {
         if ping_time.elapsed().as_secs() >= 1 {
             packet[6..8].copy_from_slice(&[96, 22]);
@@ -92,6 +93,8 @@ async fn main() {
         };
         match socket.recv(&mut buff) {
             Ok(_len) => {
+                // println!("elapsed: {:?}", t.elapsed());
+                // t = Instant::now();
                 // println!("received 2: {:?}", buff);
                 let br = f32::from_le_bytes(buff[0..4].try_into().unwrap());
                 let bx = f32::from_le_bytes(buff[4..8].try_into().unwrap());
