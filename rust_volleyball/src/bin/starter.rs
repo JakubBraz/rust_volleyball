@@ -29,7 +29,8 @@ fn main() {
 
     let udp_sender = spawn(move || udp_server::start_sender(socket_sender, udp_receiver_ch));
     let udp_server = spawn(move || udp_server::start(udp_socket, udp_logic_sender));
-    let tcp_server = spawn(move || tcp_server::start());
+    let tcp_logic_sender = logic_sender.clone();
+    let tcp_server = spawn(move || tcp_server::start(tcp_logic_sender));
     let server_logic = spawn(move || server_logic::start(logic_sender, logic_receiver, udp_sender_ch));
 
     udp_server.join().unwrap();

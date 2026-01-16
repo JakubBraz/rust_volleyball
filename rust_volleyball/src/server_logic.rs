@@ -1,16 +1,20 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 use log::error;
 use rand::Rng;
+use tokio::sync::mpsc::UnboundedSender;
 use crate::GameState;
+use crate::tcp_server::TcpMessage;
 use crate::udp_server::Key::Jump;
 use crate::udp_server::{Key, MsgIn, SenderMsg};
 
 pub enum LogicMessage {
     CalculateBoard,
-    PlayerMsg(SocketAddr, MsgIn)
+    PlayerMsg(SocketAddr, MsgIn),
+    SetChannel(u64, UnboundedSender<TcpMessage>),
+    Disconnect(u64, Option<u64>),
 }
 
 #[derive(Copy, Clone)]
@@ -29,8 +33,9 @@ pub struct GameStateSerialized {
 pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicMessage>, udp_sender: Sender<SenderMsg>) {
     let mut player_in_lobby: Option<(u64, u64)> = None;
     let mut boards: HashMap<u64, (u64, u64, GameState)> = HashMap::new();
+    // todo remove the queue
     let mut update_queue: VecDeque<(Instant, u64)> = VecDeque::new();
-    let mut ping_time : HashMap<u64, Instant> = HashMap::new();
+    let mut player_channels: HashMap<u64, UnboundedSender<TcpMessage>> = HashMap::new();
     let mut rng = rand::rng();
 
     loop {
@@ -42,29 +47,31 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                         Some((last_update, board_id)) => match boards.get_mut(&board_id) {
                             None => log::error!("Board {board_id} not found"),
                             Some((player1, player2, board)) => {
-                                // is it ok to calculate Instant twice here?
-                                let board_updated = board.step(last_update.elapsed().as_secs_f32());
-                                update_queue.push_back((Instant::now(), board_id));
+                                if player_channels.contains_key(&player1) && player_channels.contains_key(&player2) {
+                                    // is it ok to calculate Instant twice here?
+                                    let board_updated = board.step(last_update.elapsed().as_secs_f32());
+                                    update_queue.push_back((Instant::now(), board_id));
 
-                                if board_updated {
-                                    let (bx, by, br) = board.ball();
-                                    let (p1x, p1y, p1r, p2x, p2y, _p2r) = board.players();
-                                    let (score1, score2, game_over) = board.points();
-                                    let serialized = GameStateSerialized {
-                                        ball_pos: (bx, by),
-                                        ball_radius: br,
-                                        player_radius: p1r,
-                                        player1_pos: (p1x, p1y),
-                                        player2_pos: (p2x, p2y),
-                                        score1,
-                                        score2,
-                                        game_over
-                                    };
-                                    notify(&ping_time, player1, &udp_sender, serialized);
-                                    notify(&ping_time, player2, &udp_sender, serialized);
+                                    if board_updated {
+                                        let (bx, by, br) = board.ball();
+                                        let (p1x, p1y, p1r, p2x, p2y, _p2r) = board.players();
+                                        let (score1, score2, game_over) = board.points();
+                                        let serialized = GameStateSerialized {
+                                            ball_pos: (bx, by),
+                                            ball_radius: br,
+                                            player_radius: p1r,
+                                            player1_pos: (p1x, p1y),
+                                            player2_pos: (p2x, p2y),
+                                            score1,
+                                            score2,
+                                            game_over
+                                        };
+                                        notify(&udp_sender, SenderMsg::GameLogicState(*player1, serialized));
+                                        notify(&udp_sender, SenderMsg::GameLogicState(*player2, serialized));
+                                    }
+
+                                    // todo clean after game finishes
                                 }
-
-                                // todo clean after game finishes
                             }
                         }
                     };
@@ -73,23 +80,24 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                         Err(e) => log::error!("Cannot send CalculateBoard, {e}")
                     }
                 }
+                LogicMessage::SetChannel(player_id, channel) => {
+                    player_channels.insert(player_id, channel);
+                }
                 LogicMessage::PlayerMsg(addr, msg) => match msg {
-                    MsgIn::GameRequest => {
+                    MsgIn::GameRequest(player_id) => {
                         let (new_player_id, board_id) = match player_in_lobby {
                             None => {
                                 let game_id: u64 = rng.random();
-                                let player_id: u64 = rng.random();
                                 player_in_lobby = Some((player_id, game_id));
                                 (player_id, game_id)
                             }
                             Some((waiting_player_id, board_id)) => {
-                                let player_id: u64 = rng.random();
                                 let game = GameState::new();
                                 boards.insert(board_id, (waiting_player_id, player_id, game));
                                 update_queue.push_back((Instant::now(), board_id));
-                                ping_time.insert(waiting_player_id, Instant::now());
-                                ping_time.insert(player_id, Instant::now());
                                 player_in_lobby = None;
+                                send_tcp_message(&player_channels, player_id, TcpMessage::SetOpponent(waiting_player_id));
+                                send_tcp_message(&player_channels, waiting_player_id, TcpMessage::SetOpponent(player_id));
                                 match logic_sender.send(LogicMessage::CalculateBoard) {
                                     Ok(()) => {}
                                     Err(e) => log::error!("Cannot send CalculateBoard, {e}")
@@ -97,10 +105,7 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                                 (player_id, board_id)
                             }
                         };
-                        match udp_sender.send(SenderMsg::SetAddress(new_player_id, board_id, addr)) {
-                            Ok(_) => {}
-                            Err(e) => log::error!("Cannot send SetAddress, {e}")
-                        }
+                        notify(&udp_sender, SenderMsg::SetAddress(new_player_id, board_id, addr));
                     }
                     MsgIn::Input(player_id, board_id, key) => match boards.get_mut(&board_id) {
                         None => log::error!("Board id {board_id} not found"),
@@ -119,15 +124,17 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
                             }
                         }
                     },
-                    MsgIn::Ping(player_id, board_id) => {
-                        match boards.get(&board_id) {
-                            None => log::warn!("Wrong ping board id"),
-                            Some((p1, p2, _board)) => match player_id == *p1 || player_id == *p2 {
-                                true => { ping_time.insert(player_id, Instant::now()); },
-                                false => log::warn!("Wrong ping player id")
-                            }
+                }
+                LogicMessage::Disconnect(player, opponent) => {
+                    log::debug!("Player {player}, opponent {opponent:?} disconnects");
+                    [Some(player), opponent].iter().flatten().for_each(|&player_id| {
+                        send_tcp_message(&player_channels, player_id, TcpMessage::DisconnectPlayer);
+                        player_channels.remove(&player_id);
+                        notify(&udp_sender, SenderMsg::ForgetAddress(player_id));
+                        if let Some((p_id, _b_id)) = player_in_lobby && player_id == p_id {
+                            player_in_lobby = None;
                         }
-                    }
+                    });
                 }
             }
             Err(e) => error!("Game logic receive error, {e}")
@@ -135,11 +142,18 @@ pub fn start(logic_sender: Sender<LogicMessage>, logic_receiver: Receiver<LogicM
     }
 }
 
-fn notify(pings: &HashMap<u64, Instant>, player: &u64, sender: &Sender<SenderMsg>, state: GameStateSerialized) {
-    if pings.get(player).is_some_and(|t| t.elapsed() < Duration::from_secs(5)) {
-        match sender.send(SenderMsg::GameLogicState(*player, state)) {
-            Ok(_) => {}
-            Err(e) => log::error!("Cannot send UPD game state, {e}")
+fn notify(sender: &Sender<SenderMsg>, msg: SenderMsg) {
+    match sender.send(msg) {
+        Ok(_) => {}
+        Err(e) => log::warn!("Cannot send UPD game state, {e}")
+    }
+}
+
+fn send_tcp_message(channels: &HashMap<u64, UnboundedSender<TcpMessage>>, player_id: u64, message: TcpMessage) {
+    match channels.get(&player_id) {
+        None => log::error!("Player {player_id} channel not found"),
+        Some(channel) => if let Err(e) = channel.send(message) {
+            log::warn!("Cannot send message {message:?}, {e}");
         }
     }
 }
