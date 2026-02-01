@@ -82,6 +82,9 @@ func _process(delta: float) -> void:
 			$ball.position = Vector3(ball_fixed_axis, ball_y, ball_x)
 			$player1.position = Vector3(players_fixed_axis, p1_y, p1_x)
 			$player2.position = Vector3(players_fixed_axis, p2_y, p2_x)
+			#$Node3D/StaticBody3D.position = $player2.position
+			#$Node3D.position = $player2.position
+			#$Node3D.global_position = $Node3D.glo
 			
 			if score1 >= 10:
 				$game_over.text = "Green won!"
@@ -118,6 +121,16 @@ func _process(delta: float) -> void:
 		msg[6] = 97
 		msg[7] = 33
 		socket.put_packet(msg)
+		#var force = randf_range(-1.0, 1.0)
+		#$Node3D/RigidBody3D.apply_impulse(Vector3(force, force, force))
+		
+		var random_force = Vector3(
+			0, 
+			randf_range(-1.0, 1.0), 
+			randf_range(-1.0, 1.0)
+		).normalized()
+		var power = 5.0;
+		$Node3D/RigidBody3D.apply_central_impulse(random_force * power)
 		
 	if Input.is_action_just_pressed("my_key_1"):
 		print("set camera 1")
@@ -136,3 +149,8 @@ func _process(delta: float) -> void:
 func _input(_event: InputEvent) -> void:
 	pass
 	#print("ket event: ", event)
+
+
+func _physics_process(_delta):
+	var speed = 1.0
+	$Node3D.global_position = $Node3D.global_position.lerp($player2.position, speed)

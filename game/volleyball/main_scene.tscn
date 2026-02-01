@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://jk31dmrabsx"]
+[gd_scene load_steps=17 format=3 uid="uid://jk31dmrabsx"]
 
 [ext_resource type="Texture2D" uid="uid://c0tsa5a2ylhr5" path="res://golden_gate_hills_1k.hdr" id="1_0f027"]
 [ext_resource type="Script" uid="uid://da3qv4xog203x" path="res://main_scene.gd" id="1_2c62f"]
@@ -45,6 +45,10 @@ ambient_light_source = 3
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_66tet"]
 shading_mode = 0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_2c62f"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_gyfs4"]
 
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_2c62f")
@@ -168,3 +172,38 @@ offset_right = 952.0
 offset_bottom = 269.0
 theme_override_font_sizes/font_size = 50
 text = "Waiting for another player to join"
+
+[node name="Node3D" type="Node3D" parent="."]
+transform = Transform3D(0.9848077, 0, -0.17364818, 0, 1, 0, 0.17364818, 0, 0.9848077, 0, 2.0224972, 1.7985489)
+
+[node name="StaticBody3D" type="StaticBody3D" parent="Node3D"]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Node3D/StaticBody3D"]
+shape = SubResource("BoxShape3D_2c62f")
+
+[node name="CSGBox3D" type="CSGBox3D" parent="Node3D/StaticBody3D/CollisionShape3D"]
+
+[node name="Generic6DOFJoint3D" type="Generic6DOFJoint3D" parent="Node3D"]
+node_a = NodePath("../StaticBody3D")
+node_b = NodePath("../RigidBody3D")
+angular_limit_x/enabled = false
+angular_limit_y/enabled = false
+angular_limit_z/enabled = false
+angular_spring_x/enabled = true
+angular_spring_x/stiffness = 100.0
+angular_spring_x/damping = 1.0
+angular_spring_y/enabled = true
+angular_spring_y/stiffness = 100.0
+angular_spring_y/damping = 1.0
+angular_spring_z/enabled = true
+angular_spring_z/stiffness = 100.0
+angular_spring_z/damping = 1.0
+
+[node name="RigidBody3D" type="RigidBody3D" parent="Node3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3712583, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Node3D/RigidBody3D"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+shape = SubResource("BoxShape3D_gyfs4")
+
+[node name="CSGBox3D" type="CSGBox3D" parent="Node3D/RigidBody3D/CollisionShape3D"]
