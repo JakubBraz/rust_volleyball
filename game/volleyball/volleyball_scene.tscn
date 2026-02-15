@@ -1,0 +1,117 @@
+[gd_scene load_steps=14 format=3 uid="uid://ppqquo717e48"]
+
+[ext_resource type="PackedScene" uid="uid://d08gmgt2styab" path="res://volleyball_scene.blend" id="1_jre5q"]
+[ext_resource type="Script" uid="uid://d2fkpknc8jeap" path="res://volleyball_scene.gd" id="2_5ux4d"]
+[ext_resource type="Texture2D" uid="uid://cuhmdek7jxtnq" path="res://kloofendal_overcast_1k.exr" id="2_ptmeg"]
+[ext_resource type="Script" uid="uid://dhi2qtv4np6lx" path="res://joint_root_1.gd" id="4_v1tws"]
+
+[sub_resource type="PanoramaSkyMaterial" id="PanoramaSkyMaterial_ptmeg"]
+panorama = ExtResource("2_ptmeg")
+
+[sub_resource type="Sky" id="Sky_5ux4d"]
+sky_material = SubResource("PanoramaSkyMaterial_ptmeg")
+
+[sub_resource type="Environment" id="Environment_v1tws"]
+background_mode = 1
+background_color = Color(0.14317587, 0.62627125, 0.9999998, 1)
+sky = SubResource("Sky_5ux4d")
+ambient_light_source = 3
+
+[sub_resource type="BoxMesh" id="BoxMesh_5ux4d"]
+size = Vector3(0.75, 0.75, 0.75)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_v1tws"]
+points = PackedVector3Array(0.375, 0.375, 0.375, 0.375, 0.375, -0.375, -0.375, 0.375, 0.375, 0.375, -0.375, 0.375, 0.375, -0.375, -0.375, -0.375, 0.375, -0.375, -0.375, -0.375, 0.375, -0.375, -0.375, -0.375)
+
+[sub_resource type="BoxMesh" id="BoxMesh_v1tws"]
+size = Vector3(0.2, 0.2, 0.2)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_b0ply"]
+points = PackedVector3Array(0.1, 0.1, 0.1, 0.1, 0.1, -0.1, -0.1, 0.1, 0.1, 0.1, -0.1, 0.1, 0.1, -0.1, -0.1, -0.1, 0.1, -0.1, -0.1, -0.1, 0.1, -0.1, -0.1, -0.1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_b0ply"]
+size = Vector3(0.2, 0.2, 0.2)
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_cblcc"]
+points = PackedVector3Array(0.1, 0.1, 0.1, 0.1, 0.1, -0.1, -0.1, 0.1, 0.1, 0.1, -0.1, 0.1, 0.1, -0.1, -0.1, -0.1, 0.1, -0.1, -0.1, -0.1, 0.1, -0.1, -0.1, -0.1)
+
+[node name="volleyball_scene" node_paths=PackedStringArray("parent_character_1", "parent_character_2", "ball") instance=ExtResource("1_jre5q")]
+script = ExtResource("2_5ux4d")
+parent_character_1 = NodePath("parent_character_1")
+parent_character_2 = NodePath("parent_character_2")
+ball = NodePath("ball")
+
+[node name="Plane_002" parent="." index="4"]
+visible = false
+
+[node name="Sun" parent="." index="6"]
+light_energy = 1.0
+shadow_enabled = true
+
+[node name="debug_1" parent="parent_character_1" index="3"]
+visible = false
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." index="20"]
+environment = SubResource("Environment_v1tws")
+
+[node name="joint_root_1" type="StaticBody3D" parent="." index="21" node_paths=PackedStringArray("player_wrapper")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 6)
+visible = false
+script = ExtResource("4_v1tws")
+player_wrapper = NodePath("../parent_character_1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="joint_root_1" index="0"]
+mesh = SubResource("BoxMesh_5ux4d")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="joint_root_1" index="1"]
+shape = SubResource("ConvexPolygonShape3D_v1tws")
+
+[node name="joint_1_1" type="Generic6DOFJoint3D" parent="." index="22"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 6)
+node_a = NodePath("../joint_root_1")
+node_b = NodePath("../joint_node_1_1")
+angular_limit_x/enabled = false
+angular_limit_y/enabled = false
+angular_limit_z/enabled = false
+angular_spring_x/enabled = true
+angular_spring_x/stiffness = 20.0
+angular_spring_y/enabled = true
+angular_spring_y/stiffness = 20.0
+angular_spring_z/enabled = true
+angular_spring_z/stiffness = 20.0
+
+[node name="joint_node_1_1" type="RigidBody3D" parent="." index="23"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 0.5, 6)
+visible = false
+mass = 0.2
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="joint_node_1_1" index="0"]
+mesh = SubResource("BoxMesh_v1tws")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="joint_node_1_1" index="1"]
+shape = SubResource("ConvexPolygonShape3D_b0ply")
+
+[node name="joint_2_1" type="Generic6DOFJoint3D" parent="." index="24"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 6)
+node_a = NodePath("../joint_root_1")
+node_b = NodePath("../joint_node_2_1")
+angular_limit_x/enabled = false
+angular_limit_y/enabled = false
+angular_limit_z/enabled = false
+angular_spring_x/enabled = true
+angular_spring_x/stiffness = 20.0
+angular_spring_y/enabled = true
+angular_spring_y/stiffness = 20.0
+angular_spring_z/enabled = true
+angular_spring_z/stiffness = 20.0
+
+[node name="joint_node_2_1" type="RigidBody3D" parent="." index="25"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0.5, 6)
+visible = false
+mass = 0.2
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="joint_node_2_1" index="0"]
+mesh = SubResource("BoxMesh_b0ply")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="joint_node_2_1" index="1"]
+shape = SubResource("ConvexPolygonShape3D_cblcc")

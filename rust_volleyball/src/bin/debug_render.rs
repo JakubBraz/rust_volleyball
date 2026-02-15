@@ -73,6 +73,9 @@ async fn main() {
         let (xp2, yp2, rp2) = resize_ball_shape((xp2, yp2, rp2));
         draw_circle(xp1, yp1, rp1, RED);
         draw_circle(xp2, yp2, rp2, GREEN);
+        let (gsx, gsy, gsr) = game_state.ball();
+        println!("game_state player1 {} {} {}", game_state.players().0, game_state.players().1, game_state.players().2);
+        println!("resized {} {} {}", xp1, yp1, rp1);
         let (x_p, y_p, r_p) = resize_ball_shape(game_state.ball());
         draw_circle(x_p, y_p, r_p, YELLOW);
         let (x_g, y_g, w_g, h_g) = resize_box_shape(game_state.ground());
