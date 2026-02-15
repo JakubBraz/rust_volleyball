@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Volleyball"
-run/main_scene="res://main_scene.tscn"
+run/main_scene="uid://ppqquo717e48"
 config/features=PackedStringArray("4.5", "Mobile")
 config/icon="res://icon.svg"
 
@@ -49,3 +49,4 @@ my_key_4={
 [rendering]
 
 renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cuhmdek7jxtnq"
 path.bptc="res://.godot/imported/kloofendal_overcast_1k.exr-89399e5c0c24b868ab5f139701531b84.bptc.ctex"
+path.astc="res://.godot/imported/kloofendal_overcast_1k.exr-89399e5c0c24b868ab5f139701531b84.astc.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://kloofendal_overcast_1k.exr"
-dest_files=["res://.godot/imported/kloofendal_overcast_1k.exr-89399e5c0c24b868ab5f139701531b84.bptc.ctex"]
+dest_files=["res://.godot/imported/kloofendal_overcast_1k.exr-89399e5c0c24b868ab5f139701531b84.bptc.ctex", "res://.godot/imported/kloofendal_overcast_1k.exr-89399e5c0c24b868ab5f139701531b84.astc.ctex"]
 
 [params]
 
