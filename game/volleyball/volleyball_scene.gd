@@ -2,11 +2,11 @@
 extends Node
 
 # Server configuration
-const TCP_HOST := "127.0.0.1"
-#const TCP_HOST := "20.157.206.105"
+#const TCP_HOST := "127.0.0.1"
+const TCP_HOST := "20.157.206.105"
 const TCP_PORT := 12541
-const UDP_HOST := "127.0.0.1"
-#const UDP_HOST := "20.157.206.105"
+#const UDP_HOST := "127.0.0.1"
+const UDP_HOST := "20.157.206.105"
 const UDP_PORT := 12542
 
 # Protocol magic bytes
